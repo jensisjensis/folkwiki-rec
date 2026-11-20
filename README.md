@@ -1,8 +1,10 @@
-# Eso qué ye?
+# Abctransposer - search by recording?
 
-A web app for recognising and transcribing traditional Asturian instrumental folk music. It listens to a melody, transcribes it to sheet music, and searches the [AsturTrad](https://asturtrad.eu) tune library for matches. Runs entirely in the browser with no internet connection required.
+A web app for recognising and transcribing music in the abc-format. It listens to a recorded melody, reckognizes it via contour and searches the (https://www.abctransposer.de/search) tune library for matches. I've provided the file app/public/abc-zu-folkfriend-json.html which converts tune-files in the abc-format (.abc) into the file folkfriend-non-user-data.json containing the essential information on how the tunes are found via contour and linked to the project (here on the website https://www.abctransposer.de).
+It runs entirely in the browser with no internet connection required if you are only interested in the tune names.
 
-> This project is a fork of [FolkFriend](https://github.com/TomWyllie/folkfriend)
+> This project is a fork of [eso-que-ye](https://github.com/davidfm/eso-que-ye) by [davidfm](https://github.com/davidfm) being
+>  a fork of [FolkFriend](https://github.com/TomWyllie/folkfriend)
 > by [Tom Wyllie](https://github.com/TomWyllie), adapted to use the AsturTrad library.
 > All credit for the recognition engine, architecture, and original app goes to Tom.
 > The original app lives at [folkfriend.app](https://folkfriend.app).
