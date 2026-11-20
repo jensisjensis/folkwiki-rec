@@ -1,6 +1,6 @@
 {
-    "name": "Eso qué ye?",
-    "short_name": "Eso qué ye?",
+    "name": "Abctransposer - search by recording",
+    "short_name": "Abctransposersearch",
     "icons": [
         {
             "src": "/img/android-chrome-192x192.png",
@@ -15,6 +15,7 @@
     ],
     "theme_color": "#055581",
     "background_color": "#055581",
-    "start_url": ".",
+    "start_url": "./search",
+    "scope": "./",
     "display": "standalone"
 }

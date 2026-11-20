@@ -2,10 +2,7 @@
 
 import * as Comlink from '@/js/comlink';
 import ffConfig from '@/ffConfig';
-import {get,
-    set
-} from 'idb-keyval';
-
+import { get, set } from 'idb-keyval';
 
 class FolkFriendWASMWrapper {
     constructor() {
@@ -21,7 +18,7 @@ class FolkFriendWASMWrapper {
             this.setLoadedSampleRate = resolve;
         });
 
-        import ('@/wasm/folkfriend.js').then(wasm => {
+        import('@/wasm/folkfriend.js').then(wasm => {
             this.folkfriendWASM = new wasm.FolkFriendWASM();
             this.setLoadedWASM();
         });
@@ -39,137 +36,201 @@ class FolkFriendWASMWrapper {
     }
 
     async fetchTuneIndexMetadata() {
-        let url = '/nud-meta.json';
-        let indexData = await fetch(url)
-            .then((response) => response.json())
-            .catch((err) => console.log(err));
-        return indexData;
+        const response = await fetch('/nud-meta.json', {
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                'Could not fetch tune index metadata: HTTP ' +
+                response.status
+            );
+        }
+
+        const metadata = await response.json();
+
+        if (!metadata || metadata.v === undefined || metadata.v === null) {
+            throw new Error('Tune index metadata is missing the "v" field');
+        }
+
+        return metadata;
     }
 
-    async fetchTuneIndexData() {
+    async fetchTuneIndexData(version) {
+        if (version === undefined || version === null) {
+            throw new Error('A tune index version is required');
+        }
+
         console.time('index-fetch');
 
-        let url = '/folkfriend-non-user-data.json';
+        try {
+            const url =
+                '/folkfriend-non-user-data.json?v=' +
+                encodeURIComponent(String(version));
 
-        // Fetch
-        let indexData = await fetch(url)
-            .then((response) => response.json())
-            .catch((err) => console.log(err));
+            const response = await fetch(url, {
+                cache: 'no-store'
+            });
 
-        const downloadedTuneIndex = {
-            indexData: indexData
-        };
+            if (!response.ok) {
+                throw new Error(
+                    'Could not fetch tune index: HTTP ' + response.status
+                );
+            }
 
-        console.timeEnd('index-fetch');
-
-        return downloadedTuneIndex;
+            return {
+                indexData: await response.json()
+            };
+        } finally {
+            console.timeEnd('index-fetch');
+        }
     }
 
     async setupTuneIndex(cb) {
-        // This is the entry point, run every application start, for
-        //  loading in the tune index ASAP and also maintaining an up-to-date
-        //  offline copy.
-        let t0 = performance.now();
-        let analyticsData = {
-            'newly_installed': false,
-            'newly_updated': false
+        // Load the tune index at startup and keep an offline copy.
+        const t0 = performance.now();
+        const analyticsData = {
+            newly_installed: false,
+            newly_updated: false
         };
+
         console.time('tune-index-setup');
-        console.time('tune-index-load');
 
-        // This will be null if no tune index has been stored.
-        const localTuneIndex = await get('tuneIndex');
+        try {
+            const localTuneIndex = await get('tuneIndex');
 
-        if (typeof localTuneIndex === 'undefined') {
-            console.debug('No tune index was cached, requesting download');
+            if (typeof localTuneIndex === 'undefined') {
+                console.debug('No tune index was cached, requesting download');
 
-            const downloadedTuneIndex = await this.fetchTuneIndexData();
+                console.time('tune-index-load');
 
-            // Load (so the user can start using the application)
-            await this.loadTuneIndex(downloadedTuneIndex);
-            console.timeEnd('tune-index-load');
+                let tuneIndexMetadata;
+                let downloadedTuneIndex;
 
-            // Store the version of this newly downloaded tune index
-            const tuneIndexMetadata = await this.fetchTuneIndexMetadata();
-            await set('tuneIndex', downloadedTuneIndex);
-            await set('tuneIndexMetadata', tuneIndexMetadata);
+                try {
+                    // Read the version first so it can be used as the
+                    // query parameter when downloading the tune index.
+                    tuneIndexMetadata = await this.fetchTuneIndexMetadata();
+                    downloadedTuneIndex = await this.fetchTuneIndexData(
+                        tuneIndexMetadata.v
+                    );
 
-            analyticsData['days_since_update'] = 0;
-            analyticsData['tune_index_metadata_version'] = tuneIndexMetadata['v'];
-            analyticsData['newly_installed'] = true;
-        } else {
-            console.debug('Found cached tune index');
+                    await this.loadTuneIndex(downloadedTuneIndex);
+                } finally {
+                    console.timeEnd('tune-index-load');
+                }
 
-            // Load cached copy
-            await this.loadTuneIndex(localTuneIndex);
-            console.timeEnd('tune-index-load');
-
-            // THEN check the latest version and if we want to upgrade
-            const tuneIndexMetadataRemote = await this.fetchTuneIndexMetadata();
-            let tuneIndexMetadataLocal = await get('tuneIndexMetadata');
-
-            if (typeof tuneIndexMetadataLocal === 'undefined') {
-                // This is a near-impossible state, only reached by people 
-                //  selectively deleting from IndexedDB. As browsers do delete
-                //   from IndexedDB when under storage pressure it's best to
-                //   cover this case and be safe.
-                tuneIndexMetadataLocal = {
-                    'v': 0
-                };
-            }
-
-            const remoteVersion = tuneIndexMetadataRemote['v'];
-            const localVersion = tuneIndexMetadataLocal['v'];
-            const hasUpdate = remoteVersion !== localVersion;
-            console.debug(`Tune index remote: ${remoteVersion}, local: ${localVersion}`);
-
-            if (hasUpdate) {
-                console.debug('Upgrading tune index');
-                const downloadedTuneIndex = await this.fetchTuneIndexData();
                 await set('tuneIndex', downloadedTuneIndex);
-                await set('tuneIndexMetadata', tuneIndexMetadataRemote);
-                analyticsData['days_since_update'] = 0;
-                analyticsData['tune_index_metadata_version'] = tuneIndexMetadataRemote['v'];
-                analyticsData['newly_updated'] = true;
+                await set('tuneIndexMetadata', tuneIndexMetadata);
+
+                analyticsData.days_since_update = 0;
+                analyticsData.tune_index_metadata_version =
+                    tuneIndexMetadata.v;
+                analyticsData.newly_installed = true;
             } else {
-                analyticsData['tune_index_metadata_version'] = tuneIndexMetadataLocal['v'];
+                console.debug('Found cached tune index');
+
+                // Load the cached index immediately so the app remains usable
+                // while checking whether a newer version is available.
+                console.time('tune-index-load');
+
+                try {
+                    await this.loadTuneIndex(localTuneIndex);
+                } finally {
+                    console.timeEnd('tune-index-load');
+                }
+
+                let tuneIndexMetadataLocal = await get('tuneIndexMetadata');
+
+                if (typeof tuneIndexMetadataLocal === 'undefined') {
+                    // Metadata may be missing if it was cleared separately
+                    // from the cached tune index.
+                    tuneIndexMetadataLocal = { v: 0 };
+                }
+
+                analyticsData.tune_index_metadata_version =
+                    tuneIndexMetadataLocal.v;
+
+                try {
+                    const tuneIndexMetadataRemote =
+                        await this.fetchTuneIndexMetadata();
+
+                    const remoteVersion = String(tuneIndexMetadataRemote.v);
+                    const localVersion = String(tuneIndexMetadataLocal.v);
+
+                    console.debug(
+                        'Tune index remote: ' + remoteVersion +
+                        ', local: ' + localVersion
+                    );
+
+                    if (remoteVersion !== localVersion) {
+                        console.debug('Upgrading tune index');
+
+                        const downloadedTuneIndex =
+                            await this.fetchTuneIndexData(
+                                tuneIndexMetadataRemote.v
+                            );
+
+                        // Update WASM and the offline IndexedDB copy.
+                        await this.loadTuneIndex(downloadedTuneIndex);
+                        await set('tuneIndex', downloadedTuneIndex);
+                        await set('tuneIndexMetadata', tuneIndexMetadataRemote);
+
+                        analyticsData.days_since_update = 0;
+                        analyticsData.tune_index_metadata_version =
+                            tuneIndexMetadataRemote.v;
+                        analyticsData.newly_updated = true;
+                    }
+                } catch (error) {
+                    // Keep using the cached index if the network or update
+                    // request is unavailable.
+                    console.warn(
+                        'Could not check for or load a tune index update; ' +
+                        'using the cached index.',
+                        error
+                    );
+                }
             }
+
+            analyticsData.wall_time = performance.now() - t0;
+            cb(analyticsData);
+        } finally {
+            console.timeEnd('tune-index-setup');
         }
-
-        console.timeEnd('tune-index-setup');
-
-        let tEnd = performance.now();
-        analyticsData['wall_time'] = tEnd - t0;
-
-        cb(analyticsData);
     }
 
     async loadTuneIndex(tuneIndex) {
         console.time('tune-index-to-wasm');
-        await this.loadedWASM;
-        await this.folkfriendWASM.load_index_from_json_obj(tuneIndex.indexData);
-        this.setLoadedIndex();
-        console.timeEnd('tune-index-to-wasm');
+
+        try {
+            await this.loadedWASM;
+            await this.folkfriendWASM.load_index_from_json_obj(
+                tuneIndex.indexData
+            );
+            this.setLoadedIndex();
+        } finally {
+            console.timeEnd('tune-index-to-wasm');
+        }
     }
 
     async setSampleRate(sampleRate) {
         await this.loadedWASM;
 
-        // This can fail by returning false. We never actually check the return
-        //  value because it can only fail if passed an invalid sample rate,
-        //  and it's trivial to check the sample rate before passing that value
-        //  into this worker. It should be impossible for an invalid sample 
-        //  rate to make it to the worker, but even if it does the WASM backend
-        //  simply ignores the invalid sample rate and stays on the default.
+        // Invalid sample rates are ignored by the WASM backend, which
+        // retains its default. The caller should validate the value.
         await this.folkfriendWASM.set_sample_rate(sampleRate);
         this.setLoadedSampleRate();
     }
 
     async feedEntirePCMSignal(PCMSignal) {
-        const frames = Math.floor(PCMSignal.length / ffConfig.SPEC_WINDOW_SIZE);
+        const frames = Math.floor(
+            PCMSignal.length / ffConfig.SPEC_WINDOW_SIZE
+        );
+
         if (frames === 0) {
-            throw 'PCM signal too short';
+            throw new Error('PCM signal too short');
         }
+
         for (let i = 0; i < frames; i++) {
             const PCMWindow = PCMSignal.slice(
                 ffConfig.SPEC_WINDOW_SIZE * i,
@@ -182,28 +243,31 @@ class FolkFriendWASMWrapper {
     async feedSinglePCMWindow(PCMWindow) {
         await this.loadedWASM;
         await this.loadedSampleRate;
+
         const ptr = await this.folkfriendWASM.alloc_single_pcm_window();
         const arr = await this.folkfriendWASM.get_allocated_pcm_window(ptr);
 
         arr.set(PCMWindow);
 
         await this.folkfriendWASM.feed_single_pcm_window(ptr);
-        // console.debug("feedSinglePCMWindow: complete");
     }
 
     async flushPCMBuffer() {
+        await this.loadedWASM;
         await this.folkfriendWASM.flush_pcm_buffer();
     }
 
     async transcribePCMBuffer(cb) {
         try {
-            const contour = await this.folkfriendWASM.transcribe_pcm_buffer();
+            await this.loadedWASM;
+            const contour =
+                await this.folkfriendWASM.transcribe_pcm_buffer();
             cb(contour);
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
             console.warn('Aborting transcribePCMBuffer');
             cb(JSON.stringify({
-                'error': 'An error ocurred whilst transcribing audio.'
+                error: 'An error ocurred whilst transcribing audio.'
             }));
         }
     }
@@ -211,7 +275,9 @@ class FolkFriendWASMWrapper {
     async runTranscriptionQuery(query, cb) {
         await this.loadedWASM;
         await this.loadedIndex;
-        const response = await this.folkfriendWASM.run_transcription_query(query);
+
+        const response =
+            await this.folkfriendWASM.run_transcription_query(query);
         cb(JSON.parse(response));
     }
 
@@ -222,12 +288,14 @@ class FolkFriendWASMWrapper {
 
     async transcribePCMBufferSnapshot(cb) {
         try {
-            const contour = await this.folkfriendWASM.transcribe_pcm_buffer_snapshot();
+            await this.loadedWASM;
+            const contour =
+                await this.folkfriendWASM.transcribe_pcm_buffer_snapshot();
             cb(contour);
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
             cb(JSON.stringify({
-                'error': 'An error ocurred whilst transcribing audio.'
+                error: 'An error ocurred whilst transcribing audio.'
             }));
         }
     }
@@ -235,6 +303,7 @@ class FolkFriendWASMWrapper {
     async runNameQuery(query, cb) {
         await this.loadedWASM;
         await this.loadedIndex;
+
         const response = await this.folkfriendWASM.run_name_query(query);
         cb(JSON.parse(response));
     }

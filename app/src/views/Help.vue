@@ -1,4 +1,4 @@
-<!-- Modified by David Fernández, 2026. See git history for details. -->
+<!-- Modified by Jens Wollschläger, 2026. See git history for details. -->
 <template>
     <v-container 
         class="viewContainerWrapper"
@@ -10,30 +10,32 @@
             <v-icon class="WarningIcon px-3">
                 {{ icons.alertCircle }}
             </v-icon>
-            <span>Versión en desarrollo. La versión final está en <a href="https://esoqueye.asturtrad.eu/">https://esoqueye.asturtrad.eu/</a></span>
+            <span>The original project is at <a href="https://www.abctransposer.de/search">https://www.abctransposer.de/search</a></span>
         </v-card>
         <v-card class="pa-5 my-2">
-            <h1>Acerca de</h1>
+            <h1>About</h1>
             <p>
-                <em>Eso qué ye?</em> es una herramienta para reconocer música instrumental
-                tradicional asturiana. Escucha una melodía, la transcribe a partitura y busca
-                coincidencias en la biblioteca de <a href="https://asturtrad.eu" target="_blank">AsturTrad</a>.
-                Funciona completamente en el navegador, sin necesidad de conexión a internet.
+                <em>Abctransposer - search by recording</em> is a fork of <a href="https://github.com/davidfm/eso-que-ye" target="_blank">Eso Qué Ye</a> by <a href="https://github.com/davidfm">David Fernández</a> which searches the <a href="https://asturtrad.eu/" target="_blank">Asturian Traditional Music</a> database, which contains tunes in the abc format.
             </p>
             <p>
-                Esta aplicación es un fork de <a href="https://folkfriend.app" target="_blank">FolkFriend</a>,
-                desarrollada originalmente por <a href="https://github.com/TomWyllie" target="_blank">Tom Wyllie</a>,
-                a quien corresponde todo el mérito por el motor de reconocimiento, la arquitectura
-                y la aplicación original. Si tocas música folk irlandesa o de otras tradiciones,
-                visita <a href="https://folkfriend.app" target="_blank">folkfriend.app</a>.
+                My version has been adapted for the use with abctransposer.de and it searches through several tunebooks with tunes mostly from Scandinavia and the neighbouring countries. For this it uses a database creating tunes from abc in the so-called contour format. The <a href="abc-zu-folkfriend-json.html">javascript converter</a> outputs a json file called folkfriend-non-user-data.json
+                which contains all the necessary information to find the tune and connect it to the actual abc on the tune website <a href="https://www.abctransposer.de">abctransposer.de</a>. 
+
             </p>
             <p>
-                Este proyecto está licenciado bajo <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GPL-3.0</a>.
-                El código fuente está disponible en <a href="https://github.com/davidfm/eso-que-ye" target="_blank">GitHub</a>.
+                The original code Eso Qué Ye was based on is <a href="https://folkfriend.app" target="_blank">FolkFriend</a>,
+                originally developed by <a href="https://github.com/TomWyllie" target="_blank">Tom Wyllie</a>,
+                who deserves all the credit for the recognition engine, the architecture,
+                and the original application. If you play Irish or other folk music traditions,
+                visit <a href="https://folkfriend.app" target="_blank">folkfriend.app</a>.
+            </p>
+            <p>
+                This project is licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GPL-3.0</a>.
+                The source code is available on <a href="https://github.com/davidfm/eso-que-ye" target="_blank">GitHub</a>.
             </p>
         </v-card>
         <p class="AppInfo">
-            Eso qué ye? v{{ appVersion }} · Basado en FolkFriend v1.3.0<br>Índice de melodías: {{ tuneIndexVersion }}<br>© {{ year }} Tom Wyllie (original) · Fork de David Fernández
+             Based on FolkFriend v1.3.0 and Eso Qué Ye. <br>Melody index: {{ tuneIndexVersion }}<br>© {{ year }} Tom Wyllie (original) · Fork by David Fernández and then forked by Jens Wollschläger
         </p>
     </v-container>
 </template>

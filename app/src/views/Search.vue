@@ -1,19 +1,15 @@
 <template>
     <div class="search">
-        <router-link to="/">
-            <v-img
-                src="@/assets/logo.svg"
-                max-height="65"
-                max-width="75%"
-                class="mx-auto mt-5"
-                contain
-            />
+        <router-link to="/" class="search-title">
+            Abctransposer - search by recording
         </router-link>
+
         <RecorderButton
             ref="recorderButton"
             class="mx-auto my-xl-5 pt-5"
             @clickFileUpload="$refs.fileUpload.click()"
         />
+
         <input
             id="audio-upload"
             ref="fileUpload"
@@ -35,15 +31,13 @@
                 >
                     <v-text-field
                         v-model="textQuery"
-                        label="Buscar por nombre"
+                        label="Search by name"
                         solo
                         @keypress.enter="nameQuery"
                     >
                         <template #append>
                             <v-icon @click="nameQuery">
-                                {{
-                                    icons.magnify
-                                }}
+                                {{ icons.magnify }}
                             </v-icon>
                         </template>
                     </v-text-field>
@@ -79,9 +73,11 @@ import { mdiMagnify, mdiTimerOutline, mdiTimerOffOutline } from '@mdi/js';
 
 export default {
     name: 'SearchView',
+
     components: {
         RecorderButton,
     },
+
     data: function () {
         return {
             snackbar: null,
@@ -98,10 +94,11 @@ export default {
             },
         };
     },
+
     created: function () {
         eventBus.$emit('parentViewActivated');
 
-        if(!this.indexLoaded) {
+        if (!this.indexLoaded) {
             eventBus.$on('indexLoaded', () => {
                 this.indexLoaded = true;
             });
@@ -109,14 +106,15 @@ export default {
 
         eventBus.$on('searchError', (errorMsg) => {
             this.snackbar = true;
-            this.snackbarText = errorMsg || 'Se produjo un error';
+            this.snackbarText = errorMsg || 'An error occurred';
         });
     },
+
     methods: {
         nameQuery() {
-            if(this.textQuery.length < 2) {
+            if (this.textQuery.length < 2) {
                 this.snackbar = true;
-                this.snackbarText = 'La búsqueda es demasiado corta';
+                this.snackbarText = 'The search query is too short';
                 return;
             }
 
@@ -126,28 +124,31 @@ export default {
                 eventBus.$emit('childViewActivated');
             });
         },
+
         placeholderMethod() {
             console.debug('placeholder action');
         },
+
         advancedMode(mode) {
             store.userSettings.advancedMode = mode;
         },
+
         async audioFileChanged(e) {
             try {
                 store.setSearchState(store.searchStates.WORKING);
-    
+
                 console.time('file-upload');
                 const file = e.target.files[0];
                 const url = URL.createObjectURL(file);
                 const audioData = await audioService.urlToTimeDomainData(url);
                 console.timeEnd('file-upload');
-                
+
                 console.time('feed-pcm-signal');
                 await ffBackend.feedEntirePCMSignal(audioData);
                 console.timeEnd('feed-pcm-signal');
-                
+
                 await ffBackend.submitFilledBuffer();
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
             } finally {
                 store.setSearchState(store.searchStates.READY);
@@ -158,6 +159,16 @@ export default {
 </script>
 
 <style scoped>
+.search-title {
+    display: block;
+    margin: 20px auto 0;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: inherit;
+    text-decoration: none;
+}
+
 .tuneProgress {
     max-width: 50%;
     opacity: 1;

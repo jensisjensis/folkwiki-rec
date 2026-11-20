@@ -32,5 +32,6 @@ run = "npm run serve"
 description = "Production build"
 run = [
     "cd rust && ./wasm_build.sh",
+    "node -e 'require(\"node:fs\").writeFileSync(\"app/public/nud-meta.json\", JSON.stringify({v:new Date().toISOString()}))'",
     "npm --prefix app run build",
 ]

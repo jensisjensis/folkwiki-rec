@@ -4,7 +4,7 @@
         class="viewContainerWrapper"
     >
         <h1 class="my-2">
-            Resultados
+            Results
         </h1>
         <v-list class="resultsTable">
             <ResultRow
@@ -20,10 +20,10 @@
     </v-container>
     <v-container v-else>
         <h1 class="my-2">
-            Resultados
+            Results
         </h1>
         <p>
-            Graba o sube un audio para buscar en la base de datos de melodías.
+            Record audio to search the melody database.
         </p>
     </v-container>
 </template>

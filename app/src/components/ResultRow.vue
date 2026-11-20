@@ -1,20 +1,48 @@
 <!-- Modified by David Fernández, 2026. See git history for details. -->
 <template>
-    <a :href="asturTradUrl" target="_blank">
+    <a
+        class="result-link"
+        :href="asturTradUrl || null"
+        target="_blank"
+        rel="noopener noreferrer"
+    >
         <v-container
             v-ripple
             @click="addToHistory"
         >
+            <div
+                v-if="setting.tunebook"
+                class="tunebook-label"
+            >
+                {{ setting.tunebook }}
+            </div>
+
             <v-row class="pt-1 pb-0">
                 <v-col class="py-0 title-row">
-                    <h2 class="main-title">{{ name }}</h2>
-                    <span v-if="displayableAliases.length" class="alias-list">{{ displayableAliases.join(' · ') }}</span>
+                    <h2 class="main-title">
+                        {{ name }}
+                        <span
+                            v-if="hasSetGroup"
+                            class="set-group"
+                        >
+                            in the set <strong>{{ groupName }}</strong>
+                        </span>
+                    </h2>
+
+                    <span
+                        v-if="displayableAliases.length"
+                        class="alias-list"
+                    >
+                        {{ displayableAliases.join(' · ') }}
+                    </span>
                 </v-col>
             </v-row>
+
             <v-row class="pb-2 pt-0">
                 <v-col class="py-0 descriptor">
                     {{ descriptor }}
                 </v-col>
+
                 <v-col
                     v-show="score !== null"
                     class="py-0 text-right score"
@@ -30,10 +58,12 @@
 <script>
 import utils from '@/js/utils.js';
 import store from '@/services/store.js';
-import {HistoryItem} from '@/js/schema';
+import { HistoryItem } from '@/js/schema';
+import { tuneUrl } from '@/js/tuneUrl';
 
 export default {
     name: 'ResultRow',
+
     props: {
         setting: {
             type: Object,
@@ -62,40 +92,51 @@ export default {
 
     computed: {
         asturTradUrl: function () {
-            if (this.settingID && this.settingID !== this.setting.tune_id) {
-                return `https://asturtrad.eu/tune/${this.settingID}`;
-            }
-            return `https://asturtrad.eu/tune/${this.setting.tune_id}/`;
+            return tuneUrl(this.setting);
         },
+
         descriptor: function () {
             return utils.parseDisplayableDescription(this.setting);
         },
+
         name: function () {
             return utils.parseDisplayableName(this.displayName);
         },
-        displayableAliases: function () {
-            return this.aliases.map(a => utils.parseDisplayableName(a));
+
+        hasSetGroup: function () {
+            return this.setting.settuneindex !== undefined &&
+                this.setting.settuneindex !== null &&
+                Boolean(this.setting.group);
         },
+
+        groupName: function () {
+            if (!this.setting.group) {
+                return '';
+            }
+
+            return utils.parseDisplayableName(this.setting.group);
+        },
+
+        displayableAliases: function () {
+            return this.aliases.map(alias =>
+                utils.parseDisplayableName(alias)
+            );
+        },
+
         scoreLabel: function () {
-            // This mapping is a rough guideline based on experience
-            //  testing FolkFriend and how often certain scores correspond
-            //  to an accurate match. Added this in response to user feedback
-            //  from multiple people who consistently said the scores were
-            //  inaccurate and they wished FolkFriend was a bit more confident.
-            //  Also if the recording is rubbish and it comes up with very poor
-            //  matches now they will be flagged up as unlikely.
             if (this.score > 0.65) {
-                return 'Muy similar';
+                return 'Much similar';
             } else if (this.score > 0.5) {
                 return 'Similar';
             } else if (this.score > 0.2) {
-                return 'Posible';
+                return 'Possible';
             } else if (this.score > 0) {
-                return 'Poco probable';
+                return 'Not very likely';
             } else {
-                return 'Sin coincidencias';
+                return 'No match';
             }
         },
+
         scoreColour: function () {
             let x = this.score;
             x = Math.min(0.7, x);
@@ -104,41 +145,70 @@ export default {
 
             const a = '#CC1111';
             const b = '#11CC11';
+
             return utils.lerpColor(a, b, x);
-        },
+        }
     },
+
     methods: {
         addToHistory() {
             store.addToHistory(new HistoryItem({
                 settingID: this.settingID,
                 setting: this.setting,
                 displayName: this.displayName,
-                aliases: this.aliases,
+                aliases: this.aliases
             }));
-        },
-    },
+        }
+    }
 };
 </script>
 
 <style scoped>
+.result-link {
+  display: block;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tunebook-label {
+  display: block;
+  box-sizing: border-box;
+  min-height: 1.4em;
+  margin-bottom: 4px;
+  padding: 2px 0;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #777;
+  overflow: visible;
+  transform: translateY(-3px);
+}
 .title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5em;
-  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .main-title {
-  white-space: nowrap;
-  flex-shrink: 0;
+  margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.set-group {
+  display: block;
+  font-size: 0.75em;
+  font-weight: normal;
+}
+
+.set-group strong {
+  font-weight: bold;
 }
 
 .alias-list {
   font-size: 1.1em;
   color: #666;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .descriptor {
@@ -152,11 +222,6 @@ export default {
 .score {
   font-weight: bolder;
   font-style: italic;
-}
-
-.resultsTable a {
-  text-decoration: none;
-  color: inherit;
 }
 
 .resultsTable a div {

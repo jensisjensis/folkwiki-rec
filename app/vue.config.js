@@ -4,6 +4,7 @@ const version = JSON.parse(packageJson).version || '';
 const webpack = require('webpack');
 
 module.exports = {
+    publicPath: '/',
     transpileDependencies: ['vuetify'],
     configureWebpack: {
         plugins: [
@@ -18,22 +19,15 @@ module.exports = {
             asyncWebAssembly: true,
         }
     },
-    chainWebpack: (config) => {
-        // Getting PWA stuff like this to work with vue / webpack is a faff.
-        //  It's super easy to just supply the manifest file in /public ourselves.
-        config.plugins.delete('pwa');
+chainWebpack: (config) => {
+    // Benenne die im Build erzeugte index.html in mic.html um.
+    config.plugin('html').tap((args) => {
+        args[0].filename = 'mic.html';
+        return args;
+    });
 
-        // if (process.env.NODE_ENV === 'production') {
-        //     config.plugin('copy').tap((opts) => {
-        //         opts[0][0].ignore.push({
-        //             glob: 'folkfriend-non-user-data.json*',
-        //         });
-        //         opts[0][0].ignore.push({
-        //             glob: 'nud-meta.json',
-        //         });
-        //         return opts;
-        //     });
-        // }
+    // PWA-Plugin entfernen
+    config.plugins.delete('pwa');
     },
     pwa: {
         name: 'Eso qué ye?',

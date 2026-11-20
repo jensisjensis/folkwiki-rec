@@ -7,10 +7,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const MS_12_HOURS = 12 * 60 * 60 * 1000;
 const MS_6_MONTHS = 365 * MS_12_HOURS;
 
-const NOTE_MAP_ES = { 'C': 'Do', 'D': 'Re', 'E': 'Mi', 'F': 'Fa', 'G': 'Sol', 'A': 'La', 'B': 'Si' };
-const MODE_MAP_ES = { 'major': 'mayor', 'minor': 'menor', 'dorian': 'dórico', 'mixolydian': 'mixolidio', 'lydian': 'lidio', 'phrygian': 'frigio', 'locrian': 'locrio' };
-
-function parseModeSpanish(modeStr) {
+function parseModeEnglish(modeStr) {
     const match = modeStr.match(/^([A-G][#b]?)(.*)$/);
     if (!match) return modeStr;
 
@@ -18,6 +15,7 @@ function parseModeSpanish(modeStr) {
     const modePart = match[2].toLowerCase();
 
     let mode;
+
     if (modePart.includes('dor'))       mode = 'dorian';
     else if (modePart.includes('mix'))  mode = 'mixolydian';
     else if (modePart.includes('lyd'))  mode = 'lydian';
@@ -26,12 +24,7 @@ function parseModeSpanish(modeStr) {
     else if (modePart.includes('min') || modePart === 'm') mode = 'minor';
     else                                mode = 'major';
 
-    const baseNote = NOTE_MAP_ES[note[0]] || note[0];
-    const accidental = note.slice(1);
-    const spanishNote = baseNote + accidental;
-    const spanishMode = MODE_MAP_ES[mode] || mode;
-
-    return `${spanishNote} ${spanishMode}`;
+    return `${note} ${mode}`;
 }
 
 // Wrap in a class for ease of exports
@@ -70,7 +63,11 @@ export default class utils {
     }
 
     static parseDisplayableDescription(setting) {
-        return `${setting.dance} en ${parseModeSpanish(setting.mode)}`;
+    const mode = parseModeEnglish(setting.mode);
+
+    return setting.dance
+        ? `${setting.dance}, ${mode}`
+        : mode;
     }
 
     static lerpColor(a, b, amount) {

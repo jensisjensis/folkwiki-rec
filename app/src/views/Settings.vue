@@ -41,14 +41,14 @@
         >
             <h1>Download</h1>
             <p>
-                Eso qué ye? is a "Web App", which means it installs onto your
+                Abctransposer - search by recording is a "Web App", which means it installs onto your
                 Home Screen just like any other app.
             </p>
             <p
                 v-if="isPWA"
                 align="center"
             >
-                Eso qué ye? is installed <v-icon class="pb-1 Installed">
+                Abctransposer - search by recording is installed <v-icon class="pb-1 Installed">
                     {{ icons.checkCircle }}
                 </v-icon>
             </p>
@@ -94,7 +94,7 @@
                 </ul>
             </p>
             <p v-else>
-                To install Eso qué ye?, navigate to the settings of your browser
+                To install Abctransposer - search by recording, navigate to the settings of your browser
                 and select "Add to Home Screen" or "Install App".
             </p>
         </v-card>

@@ -1,10 +1,9 @@
 <template>
-    <v-container 
-        class="viewContainerWrapper"
-    >
+    <v-container class="viewContainerWrapper">
         <h1 class="my-2">
-            Historial
+            History
         </h1>
+
         <v-list class="resultsTable">
             <HistoryRow
                 v-for="historyRow in historyRowsProps"
@@ -24,38 +23,48 @@ import eventBus from '@/eventBus';
 import store from '@/services/store';
 import HistoryRow from '@/components/HistoryRow';
 import utils from '@/js/utils';
+import { tuneUrl } from '@/js/tuneUrl';
 
 export default {
     name: 'HistoryView',
+
     components: {
         HistoryRow,
     },
-    data: function() {
+
+    data: function () {
         return {
             historyItems: [],
             historyRowsProps: [],
-        }; 
+        };
     },
+
     created: function () {
         eventBus.$emit('parentViewActivated');
+
         store.getHistoryItems().then((historyItems) => {
-            this.historyItems = historyItems.filter(i => !i.result.contour);
+            this.historyItems = historyItems.filter(
+                historyItem => !historyItem.result.contour
+            );
+
             this.historyRowsProps = this.historyItems.map((historyItem) => {
-                const tuneID = historyItem.result.setting.tune_id;
-                const settingID = historyItem.result.settingID;
-                const url = settingID && settingID !== tuneID
-                    ? `https://asturtrad.eu/tune/${settingID}`
-                    : `https://asturtrad.eu/tune/${tuneID}/`;
+                const setting = historyItem.result.setting;
+
                 return {
-                    name: utils.parseDisplayableName(historyItem.result.displayName),
-                    aliases: (historyItem.result.aliases || []).map(a => utils.parseDisplayableName(a)),
-                    descriptor: utils.parseDisplayableDescription(historyItem.result.setting),
+                    name: utils.parseDisplayableName(
+                        historyItem.result.displayName
+                    ),
+                    aliases: (historyItem.result.aliases || []).map(alias =>
+                        utils.parseDisplayableName(alias)
+                    ),
+                    descriptor: utils.parseDisplayableDescription(setting),
                     timestamp: historyItem.timestamp,
-                    url,
+                    url: tuneUrl(setting),
                 };
             });
         });
     },
+
     methods: {}
 };
 </script>
@@ -63,5 +72,8 @@ export default {
 <style scoped>
 .resultsTable > div:nth-child(odd) {
     background: #efefef;
+}
+.container {
+  cursor: pointer;
 }
 </style>

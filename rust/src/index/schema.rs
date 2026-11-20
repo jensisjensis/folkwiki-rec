@@ -16,4 +16,16 @@ pub struct Setting {
     pub mode: String,
     pub dance: String,
     pub contour: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tunebook: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index: Option<u32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settuneindex: Option<u32>,
 }

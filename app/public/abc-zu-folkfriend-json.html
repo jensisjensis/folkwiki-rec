@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABC zu FolkFriend JSON</title>
+<style>
+  :root { font: 16px/1.5 system-ui, sans-serif; color: #17212b; }
+  body { max-width: 940px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.6rem; }
+  label { display: block; margin: 1rem 0 .35rem; font-weight: 650; }
+  input, textarea, button { font: inherit; }
+  input[type="text"], textarea {
+    width: 100%; box-sizing: border-box; padding: .65rem;
+    border: 1px solid #aab5bf; border-radius: .4rem;
+  }
+  input[type="file"] { display: block; margin: .4rem 0; }
+  textarea { min-height: 175px; font: 14px/1.45 ui-monospace, monospace; }
+  button {
+    margin: 1rem .5rem 1rem 0; padding: .65rem 1rem; border: 0;
+    border-radius: .4rem; background: #055581; color: white; cursor: pointer;
+  }
+  button.secondary { background: #45545f; }
+  .note { padding: .8rem 1rem; background: #eef6fb; border-left: 4px solid #1681b5; }
+  .warning { padding: .8rem 1rem; background: #fff5d8; border-left: 4px solid #dda900; }
+  #status { white-space: pre-wrap; margin: .5rem 0 1rem; }
+</style>
+</head>
+<body>
+<h1>ABC → FolkFriend JSON</h1>
+<p>Lade ABC-Dateien oder füge ABC-Text ein. Optional kannst du eine bestehende
+<code>folkfriend-non-user-data.json</code> laden, damit deren Einträge erhalten bleiben.</p>
+
+<div class="note">
+  <strong>Konturcodierung:</strong> MIDI 48–95 wird über
+  <code>abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV</code> codiert.
+  Jedes Zeichen entspricht einer Quaver (Achtelnote).
+</div>
+<div class="warning">
+  <strong>Verarbeitung:</strong> Bei mehrstimmigen Stücken wird die erste
+  deklarierte Stimme verwendet. <code>K:none</code> gilt als <code>K:C</code>.
+  Falls die Melodie außerhalb MIDI 48–95 liegt, wird sie möglichst oktavweise verschoben.
+  Tunes mit demselben <code>G:</code>-Wert werden als Set gespeichert und innerhalb
+  des Sets mit <code>settuneindex</code> nummeriert. Akkorde werden für die Kontur
+  durch ihren höchsten Ton repräsentiert. Broken Rhythm kann auch auf Pausen folgen.
+</div>
+
+<label for="abcFiles">ABC-Datei(en)</label>
+<input id="abcFiles" type="file" accept=".abc,.txt,text/plain" multiple>
+
+<label for="abcText">Oder ABC-Text einfügen</label>
+<textarea id="abcText" placeholder="X:1&#10;T:Mein Tune&#10;M:2/4&#10;L:1/8&#10;K:D&#10;D E F G | A4 |"></textarea>
+
+<label for="tunebookName">Tunebook-Dateiname für eingefügten ABC-Text</label>
+<input id="tunebookName" type="text" value="flensburg.abc" placeholder="z. B. flensburg.abc">
+
+<label for="jsonFile">Bestehende FolkFriend-JSON (optional)</label>
+<input id="jsonFile" type="file" accept=".json,application/json">
+
+<label for="dance">Tanzkategorie für neue Tunes (optional)</label>
+<input id="dance" type="text" placeholder="z. B. Vals, Muñeira, Xota">
+
+<button id="convert">JSON erzeugen und herunterladen</button>
+<button class="secondary" id="clear">Zurücksetzen</button>
+
+<div id="status" role="status"></div>
+<label for="preview">Vorschau der erzeugten JSON</label>
+<textarea id="preview" readonly placeholder="Nach dem Umwandeln erscheint hier die JSON-Vorschau."></textarea>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const MIDI_LOW = 48;
+const MIDI_HIGH = 95;
+const CONTOUR_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV";
+const NATURAL = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+let abcFileTexts = [];
+let existingIndex = null;
+
+$("abcFiles").addEventListener("change", async event => {
+  abcFileTexts = await Promise.all(
+    [...event.target.files].map(async file => ({
+      text: await file.text(),
+      tunebook: file.name
+    }))
+  );
+  $("status").textContent = `${abcFileTexts.length} ABC-Datei(en) geladen.`;
+});
+
+$("jsonFile").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    existingIndex = JSON.parse(await file.text());
+    if (!existingIndex || typeof existingIndex !== "object" ||
+        !existingIndex.settings || !existingIndex.aliases) {
+      throw new Error("Erwartet wird ein Objekt mit „settings“ und „aliases“.");
+    }
+    $("status").textContent =
+      "Bestehende JSON geladen; vorhandene Einträge bleiben erhalten.";
+  } catch (error) {
+    existingIndex = null;
+    $("status").textContent = "JSON konnte nicht geladen werden: " + error.message;
+  }
+});
+
+$("clear").addEventListener("click", () => {
+  $("abcFiles").value = "";
+  $("jsonFile").value = "";
+  $("abcText").value = "";
+  $("tunebookName").value = "flensburg.abc";
+  $("dance").value = "";
+  $("preview").value = "";
+  $("status").textContent = "";
+  abcFileTexts = [];
+  existingIndex = null;
+});
+
+function slugify(text) {
+  return (text || "untitled").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "untitled";
+}
+
+function splitTunes(text) {
+  const lines = text.replace(/\r/g, "").split("\n");
+  const blocks = [];
+  let current = [];
+
+  for (const line of lines) {
+    if (/^\s*X\s*:/.test(line) && current.length) {
+      blocks.push(current.join("\n"));
+      current = [];
+    }
+    current.push(line);
+  }
+
+  if (current.length) blocks.push(current.join("\n"));
+  return blocks.filter(block => /^\s*(?:X|T|K)\s*:/mi.test(block));
+}
+
+function headerField(block, name, fallback = "") {
+  const match = block.match(new RegExp("^\\s*" + name + "\\s*:\\s*(.*)$", "mi"));
+  return match ? match[1].trim() : fallback;
+}
+
+function parseFraction(text, fallback) {
+  if (!text) return fallback;
+  const match = text.trim().match(/^(\d+)(?:\/(\d+))?$/);
+  if (!match) return fallback;
+  const value = Number(match[1]) / Number(match[2] || 1);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function pitchClass(letter, accidental) {
+  const base = NATURAL[letter[0].toUpperCase()];
+  return (base + (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) + 12) % 12;
+}
+
+const MAJOR_SIGNATURES = {
+  0: ["C", 0], 1: ["Db", -5], 2: ["D", 2], 3: ["Eb", -3],
+  4: ["E", 4], 5: ["F", -1], 6: ["F#", 6], 7: ["G", 1],
+  8: ["Ab", -4], 9: ["A", 3], 10: ["Bb", -2], 11: ["B", 5]
+};
+const SHARP_ORDER = ["F", "C", "G", "D", "A", "E", "B"];
+const FLAT_ORDER = ["B", "E", "A", "D", "G", "C", "F"];
+
+const MODE_OFFSETS = {
+  "": 0, maj: 0, major: 0, ion: 0, ionian: 0,
+  dor: 2, dorian: 2, phr: 4, phrygian: 4,
+  lyd: 5, lydian: 5, mix: 7, mixolydian: 7,
+  min: 9, minor: 9, m: 9, aeol: 9, aeolian: 9,
+  loc: 11, locrian: 11
+};
+const MODE_SUFFIX = {
+  "": "maj", maj: "maj", major: "maj", ion: "maj", ionian: "maj",
+  dor: "dor", dorian: "dor", phr: "phr", phrygian: "phr",
+  lyd: "lyd", lydian: "lyd", mix: "mix", mixolydian: "mix",
+  min: "min", minor: "min", m: "min", aeol: "min", aeolian: "min",
+  loc: "loc", locrian: "loc"
+};
+
+function parseKey(rawKey) {
+  const value = (rawKey || "C").trim();
+
+  if (/^none(?:\s|$)/i.test(value)) {
+    return { signature: {}, metadataMode: "Cmaj", displayKey: "C" };
+  }
+
+  const first = value.split(/\s+/)[0];
+  const match = first.match(/^([A-Ga-g])([#b]?)(.*)$/);
+  if (!match) throw new Error(`Ungültige Tonart: ${rawKey}`);
+
+  const tonicLetter = match[1].toUpperCase();
+  const tonicAcc = match[2];
+  let modeText = (match[3] || "").toLowerCase();
+
+  if (!modeText && match[1] === match[1].toLowerCase()) modeText = "min";
+
+  const modeOffset = MODE_OFFSETS[modeText];
+  if (modeOffset === undefined) {
+    throw new Error(`Nicht unterstützter Modus in K:${rawKey}`);
+  }
+
+  const tonicPc = pitchClass(tonicLetter, tonicAcc);
+  const relativeMajorPc = (tonicPc - modeOffset + 12) % 12;
+  const [relativeMajorName, signatureCount] = MAJOR_SIGNATURES[relativeMajorPc];
+  const signature = {};
+
+  if (signatureCount > 0) {
+    SHARP_ORDER.slice(0, signatureCount).forEach(letter => signature[letter] = 1);
+  } else if (signatureCount < 0) {
+    FLAT_ORDER.slice(0, -signatureCount).forEach(letter => signature[letter] = -1);
+  }
+
+  return {
+    signature,
+    metadataMode: tonicLetter + tonicAcc + (MODE_SUFFIX[modeText] || "maj"),
+    displayKey: relativeMajorName
+  };
+}
+
+function extractMusicBody(block) {
+  const lines = block.replace(/\r/g, "").split("\n");
+  const firstVoiceMatch = block.match(/^\s*V\s*:\s*([^\s]+)/mi);
+
+  if (!firstVoiceMatch) return cleanMusicLines(lines);
+
+  const firstVoice = firstVoiceMatch[1];
+  let activeVoice = null;
+  const selectedLines = [];
+
+  for (const line of lines) {
+    const voiceField = line.match(/^\s*V\s*:\s*([^\s]+)/i);
+
+    if (voiceField) {
+      activeVoice = voiceField[1];
+      continue;
+    }
+
+    if (activeVoice !== firstVoice) continue;
+
+    const keyField = line.match(/^\s*K\s*:\s*(.*)$/i);
+    if (keyField) {
+      selectedLines.push(`[K:${keyField[1].trim()}]`);
+      continue;
+    }
+
+    selectedLines.push(line);
+  }
+
+  return cleanMusicLines(selectedLines);
+}
+
+function cleanMusicLines(lines) {
+  return lines.filter(line =>
+    !/^\s*%/.test(line) &&
+    !/^\s*(?:[A-Za-z+]:|%%)/.test(line)
+  ).join("\n")
+    .replace(/"[^"]*"/g, "")
+    .replace(/![^!]*!|\+[^+]*\+/g, "")
+    .replace(/\{[^}]*\}/g, "");
+}
+
+function parseNoteToken(token) {
+  const match = token.match(/^(\^{1,2}|_{1,2}|=)?([A-Ga-g])([,']*)(\d+)?(\/+\d*)?-?$/);
+  if (!match) return null;
+
+  const [, explicitAcc = "", letter, octaveMarks = "", digits = "", slash = ""] = match;
+  const upper = letter.toUpperCase();
+  let lengthFactor = digits ? Number(digits) : 1;
+
+  if (slash) {
+    const slashCount = (slash.match(/\//g) || []).length;
+    const denominator = slash.match(/\/(\d+)/);
+    lengthFactor *= denominator ? 1 / Number(denominator[1]) : 1 / (2 ** slashCount);
+  }
+
+  let octave = letter === letter.toLowerCase() ? 5 : 4;
+  for (const mark of octaveMarks) octave += mark === "'" ? 1 : -1;
+
+  return {
+    letter: upper,
+    explicitAcc,
+    octave,
+    lengthFactor,
+    midiWithoutAlter: 12 * (octave + 1) + NATURAL[upper]
+  };
+}
+
+function resolveMidi(note, signature, accidentalAtBar) {
+  const accidentalKey = `${note.letter}${note.octave}`;
+  let alter = signature[note.letter] || 0;
+
+  if (note.explicitAcc === "^") alter = 1;
+  else if (note.explicitAcc === "^^") alter = 2;
+  else if (note.explicitAcc === "_") alter = -1;
+  else if (note.explicitAcc === "__") alter = -2;
+  else if (note.explicitAcc === "=") alter = 0;
+
+  if (note.explicitAcc) {
+    accidentalAtBar[accidentalKey] = alter;
+  } else if (Object.prototype.hasOwnProperty.call(accidentalAtBar, accidentalKey)) {
+    alter = accidentalAtBar[accidentalKey];
+  }
+
+  return note.midiWithoutAlter + alter;
+}
+
+function parseChordToken(token, signature, accidentalAtBar) {
+  const chordMatch = token.match(/^\[([^\]]+)\](\d*(?:\/+\d*)?)-?$/);
+  if (!chordMatch) return null;
+
+  const chordNotes = chordMatch[1].match(/(?:\^{1,2}|_{1,2}|=)?[A-Ga-g][,']*/g) || [];
+  if (!chordNotes.length) return null;
+
+  const resolvedNotes = [];
+
+  for (const chordNoteToken of chordNotes) {
+    const chordNote = parseNoteToken(chordNoteToken);
+    if (!chordNote) continue;
+    resolvedNotes.push({ midi: resolveMidi(chordNote, signature, accidentalAtBar) });
+  }
+
+  if (!resolvedNotes.length) return null;
+
+  const highest = resolvedNotes.reduce((currentHighest, current) =>
+    current.midi > currentHighest.midi ? current : currentHighest
+  );
+
+  const durationNote = parseNoteToken(`C${chordMatch[2] || ""}`);
+
+  return {
+    midi: highest.midi,
+    lengthFactor: durationNote ? durationNote.lengthFactor : 1
+  };
+}
+
+function applyMidiRange(events) {
+  const low = Math.min(...events.map(event => event.midi));
+  const high = Math.max(...events.map(event => event.midi));
+  const minimumOctaves = Math.ceil((MIDI_LOW - low) / 12);
+  const maximumOctaves = Math.floor((MIDI_HIGH - high) / 12);
+  const warnings = [];
+
+  if (minimumOctaves <= maximumOctaves) {
+    const octaves = Math.max(minimumOctaves, Math.min(maximumOctaves, 0));
+    if (octaves !== 0) {
+      events.forEach(event => event.midi += 12 * octaves);
+      warnings.push(`Melodie um ${Math.abs(octaves)} Oktave(n) ${octaves > 0 ? "nach oben" : "nach unten"} verschoben.`);
+    }
+    return warnings;
+  }
+
+  const midpoint = (low + high) / 2;
+  const globalOctaves = Math.round((71.5 - midpoint) / 12);
+  if (globalOctaves !== 0) events.forEach(event => event.midi += 12 * globalOctaves);
+
+  let individuallyAdjusted = 0;
+  for (const event of events) {
+    while (event.midi < MIDI_LOW) {
+      event.midi += 12;
+      individuallyAdjusted++;
+    }
+    while (event.midi > MIDI_HIGH) {
+      event.midi -= 12;
+      individuallyAdjusted++;
+    }
+  }
+
+  if (globalOctaves !== 0) {
+    warnings.push(`Melodie global um ${Math.abs(globalOctaves)} Oktave(n) ${globalOctaves > 0 ? "nach oben" : "nach unten"} verschoben.`);
+  }
+  if (individuallyAdjusted) {
+    warnings.push(`${individuallyAdjusted} einzelne Note(n) zusätzlich oktavweise in MIDI ${MIDI_LOW}–${MIDI_HIGH} angepasst.`);
+  }
+
+  return warnings;
+}
+
+function parseTune(block) {
+  const titles = [...block.matchAll(/^\s*T\s*:\s*(.*)$/gmi)]
+    .map(match => match[1].trim()).filter(Boolean);
+  const title = titles[0] || "Untitled tune";
+  const meter = headerField(block, "M", "4/4");
+  const unit = parseFraction(headerField(block, "L", ""), 1 / 8);
+  const initialKey = parseKey(headerField(block, "K", "C"));
+  const groupFieldPresent = /^\s*G\s*:/mi.test(block);
+  const group = headerField(block, "G", "").trim();
+
+  let signature = { ...initialKey.signature };
+  let reportedMode = initialKey.metadataMode;
+  let accidentalAtBar = Object.create(null);
+  let tupleFactor = 1;
+  let tupleNotesLeft = 0;
+  let pendingBroken = null;
+  let lastRhythmItem = null;
+  const events = [];
+  const body = extractMusicBody(block);
+
+  const tokenPattern =
+    /\[K:[^\]]+\]|\[L:[^\]]+\]|\[M:[^\]]+\]|\[[^\]]*\]\d*(?:\/+\d*)?-?|\|:|:\||:\|:|\|\]|\[\||\|\||\||\(\d+(?::\d+(?::\d+)?)?|[<>]+|(?:\^{1,2}|_{1,2}|=)?[A-Ga-g][,']*(?:\d+)?(?:\/+\d*)?-?|[zxZX]\d*(?:\/+\d*)?/g;
+
+  let cursor = 0;
+  let match;
+
+  while ((match = tokenPattern.exec(body))) {
+    const skipped = body.slice(cursor, match.index);
+    if (/[><]/.test(skipped)) {
+      throw new Error(`${title}: Broken-Rhythm-Zeichen konnte nicht verarbeitet werden.`);
+    }
+    cursor = tokenPattern.lastIndex;
+    const token = match[0];
+
+    const inlineKey = token.match(/^\[K:([^\]]+)\]$/i);
+    if (inlineKey) {
+      const parsedKey = parseKey(inlineKey[1]);
+      signature = { ...parsedKey.signature };
+      accidentalAtBar = Object.create(null);
+      if (events.length === 0) reportedMode = parsedKey.metadataMode;
+      continue;
+    }
+
+    if (/^\[(?:L|M):/i.test(token)) continue;
+
+    if (token.startsWith("[") && !/^\[[^\]]*\]\d*(?:\/+\d*)?-?$/.test(token)) {
+      continue;
+    }
+
+    if (/^(?:\||:)/.test(token)) {
+      if (pendingBroken) {
+        throw new Error(`${title}: Broken Rhythm steht direkt vor einem Taktstrich statt vor einer Note oder Pause.`);
+      }
+      accidentalAtBar = Object.create(null);
+      lastRhythmItem = null;
+      continue;
+    }
+
+    const tuplet = token.match(/^\((\d+)(?::(\d+))?(?::(\d+))?$/);
+    if (tuplet) {
+      const n = Number(tuplet[1]);
+      const inTimeOf = Number(tuplet[2] || (n === 2 ? 3 : n === 3 || n === 4 ? 2 : n - 1));
+      tupleFactor = inTimeOf / n;
+      tupleNotesLeft = Number(tuplet[3] || n);
+      continue;
+    }
+
+    if (/^[<>]+$/.test(token)) {
+      if (pendingBroken) {
+        throw new Error(`${title}: Mehrere getrennte Broken-Rhythm-Gruppen hintereinander werden nicht unterstützt.`);
+      }
+      if (!lastRhythmItem) {
+        throw new Error(`${title}: Broken Rhythm hat keine vorhergehende Note oder Pause.`);
+      }
+
+      pendingBroken = {
+        direction: token[0],
+        count: token.length,
+        previous: lastRhythmItem
+      };
+      continue;
+    }
+
+    let note = parseNoteToken(token);
+    let midi;
+
+    if (!note && token.startsWith("[")) {
+      const chord = parseChordToken(token, signature, accidentalAtBar);
+      if (chord) {
+        note = { lengthFactor: chord.lengthFactor };
+        midi = chord.midi;
+      }
+    }
+
+    if (!note) {
+      const restMatch = token.match(/^[zxZX](\d+)?(\/+\d*)?$/);
+
+      if (restMatch) {
+        const restLength = parseNoteToken(
+          `C${restMatch[1] || ""}${restMatch[2] || ""}`
+        );
+
+        let restQuavers =
+          unit * (restLength ? restLength.lengthFactor : 1) * 8 * tupleFactor;
+
+        if (pendingBroken) {
+          const previousItem = pendingBroken.previous;
+          const transferFraction = 1 - (1 / (2 ** pendingBroken.count));
+          const previousDuration = previousItem.type === "note"
+            ? events[previousItem.index].exactQuavers
+            : previousItem.duration;
+
+          if (pendingBroken.direction === ">") {
+            const transferred = restQuavers * transferFraction;
+
+            if (previousItem.type === "note") {
+              events[previousItem.index].exactQuavers += transferred;
+            } else {
+              previousItem.duration += transferred;
+            }
+
+            restQuavers -= transferred;
+          } else {
+            const transferred = previousDuration * transferFraction;
+
+            if (previousItem.type === "note") {
+              events[previousItem.index].exactQuavers -= transferred;
+            } else {
+              previousItem.duration -= transferred;
+            }
+
+            restQuavers += transferred;
+          }
+
+          pendingBroken = null;
+        }
+
+        if (!(restQuavers > 0)) {
+          throw new Error(`${title}: Broken Rhythm ergab eine ungültige Pausendauer.`);
+        }
+
+        lastRhythmItem = {
+          type: "rest",
+          duration: restQuavers
+        };
+      }
+
+      if (tupleNotesLeft > 0) {
+        tupleNotesLeft--;
+        if (tupleNotesLeft === 0) tupleFactor = 1;
+      }
+      continue;
+    }
+
+    if (midi === undefined) {
+      midi = resolveMidi(note, signature, accidentalAtBar);
+    }
+
+    let exactQuavers = unit * note.lengthFactor * 8 * tupleFactor;
+
+    if (pendingBroken) {
+      const previousItem = pendingBroken.previous;
+      const transferFraction = 1 - (1 / (2 ** pendingBroken.count));
+      const previousDuration = previousItem.type === "note"
+        ? events[previousItem.index].exactQuavers
+        : previousItem.duration;
+
+      if (pendingBroken.direction === ">") {
+        const transferred = exactQuavers * transferFraction;
+
+        if (previousItem.type === "note") {
+          events[previousItem.index].exactQuavers += transferred;
+        } else {
+          previousItem.duration += transferred;
+        }
+
+        exactQuavers -= transferred;
+      } else {
+        const transferred = previousDuration * transferFraction;
+
+        if (previousItem.type === "note") {
+          events[previousItem.index].exactQuavers -= transferred;
+        } else {
+          previousItem.duration -= transferred;
+        }
+
+        exactQuavers += transferred;
+      }
+
+      pendingBroken = null;
+    }
+
+    if (!(exactQuavers > 0)) {
+      throw new Error(`${title}: Broken Rhythm ergab eine ungültige Notendauer.`);
+    }
+
+    events.push({ midi, exactQuavers, token });
+    lastRhythmItem = {
+      type: "note",
+      index: events.length - 1
+    };
+
+    if (tupleNotesLeft > 0) {
+      tupleNotesLeft--;
+      if (tupleNotesLeft === 0) tupleFactor = 1;
+    }
+  }
+
+  if (/[><]/.test(body.slice(cursor))) {
+    throw new Error(`${title}: Broken-Rhythm-Zeichen konnte nicht verarbeitet werden.`);
+  }
+  if (pendingBroken) {
+    throw new Error(`${title}: Broken Rhythm am Ende des Stücks hat keine folgende Note oder Pause.`);
+  }
+  if (!events.length) throw new Error(`${title}: keine Melodienoten erkannt.`);
+
+  const rangeWarnings = applyMidiRange(events);
+  const contour = events.map(event => {
+    const quavers = Math.max(1, Math.round(event.exactQuavers));
+    return CONTOUR_CHARS[event.midi - MIDI_LOW].repeat(quavers);
+  }).join("");
+
+  return {
+    title,
+    titles: titles.length ? titles : [title],
+    meter,
+    mode: reportedMode,
+    contour,
+    group,
+    groupFieldPresent,
+    warnings: rangeWarnings
+  };
+}
+
+function buildIndex(sources) {
+  const index = existingIndex
+    ? JSON.parse(JSON.stringify(existingIndex))
+    : { settings: {}, aliases: {} };
+
+  index.settings ||= {};
+  index.aliases ||= {};
+
+  const dance = $("dance").value.trim();
+  const report = [];
+
+  for (const source of sources) {
+    const tunebook = (source.tunebook || "").trim();
+    let nextTuneIndex = 1;
+    const setTuneCounts = new Map();
+
+    for (const block of splitTunes(source.text)) {
+      const isGroupTune = /^\s*G\s*:/mi.test(block);
+      const group = headerField(block, "G", "").trim();
+
+      let tuneIndex = null;
+      let setTuneIndex = null;
+
+      if (isGroupTune) {
+        setTuneIndex = (setTuneCounts.get(group) || 0) + 1;
+        setTuneCounts.set(group, setTuneIndex);
+      } else {
+        tuneIndex = nextTuneIndex;
+        nextTuneIndex++;
+      }
+
+      try {
+        const tune = parseTune(block);
+        const baseId = slugify(tune.title);
+        let id = baseId;
+        let suffix = 2;
+
+        while (index.settings[id]) {
+          id = `${baseId}-${suffix++}`;
+        }
+
+        const entry = {
+          tune_id: id,
+          meter: tune.meter,
+          mode: tune.mode,
+          dance,
+          contour: tune.contour,
+          tunebook
+        };
+
+        if (isGroupTune) {
+          entry.group = group;
+          entry.settuneindex = setTuneIndex;
+          report.push(
+            `OK ${id}: Tune ${setTuneIndex} im Set „${group || "(ohne Gruppennamen)"}“`
+          );
+        } else {
+          entry.index = tuneIndex;
+          report.push(`OK ${id}: Tune ${tuneIndex} in ${tunebook || "Tunebook"}`);
+        }
+
+        index.settings[id] = entry;
+        index.aliases[id] = [...new Set(tune.titles)];
+
+        for (const warning of tune.warnings) {
+          report.push(`  WARNUNG ${id}: ${warning}`);
+        }
+      } catch (error) {
+        report.push(`FEHLER ${error.message}`);
+      }
+    }
+  }
+
+  return { index, report };
+}
+
+$("convert").addEventListener("click", () => {
+  try {
+    const pasted = $("abcText").value.trim();
+    const sources = [...abcFileTexts];
+
+    if (pasted) {
+      sources.push({
+        text: pasted,
+        tunebook: $("tunebookName").value.trim() || "tunebook.abc"
+      });
+    }
+
+    if (!sources.length) {
+      $("status").textContent = "Bitte eine ABC-Datei laden oder ABC-Text einfügen.";
+      return;
+    }
+
+    const { index, report } = buildIndex(sources);
+    const json = JSON.stringify(index, null, 2);
+    $("preview").value = json;
+
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "folkfriend-non-user-data.json";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    $("status").textContent =
+      `Fertig.\n${report.join("\n")}\n\n` +
+      "Tunes mit G: erhalten group und eine settuneindex-Nummer innerhalb ihres Sets. Andere Tunes werden pro Tunebook ab 1 nummeriert.";
+  } catch (error) {
+    $("status").textContent = "Fehler: " + error.message;
+  }
+});
+</script>
+</body>
+</html>
