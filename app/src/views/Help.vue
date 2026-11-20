@@ -10,7 +10,7 @@
             <v-icon class="WarningIcon px-3">
                 {{ icons.alertCircle }}
             </v-icon>
-            <span>The original project is at <a href="https://www.abctransposer.de/search">https://www.abctransposer.de/search</a></span>
+            <span>The original project is at <a href="https://www.abctransposer.de/search">https://www.abctransposer.de/search</a></span> 
         </v-card>
         <v-card class="pa-5 my-2">
             <h1>About</h1>
@@ -20,7 +20,7 @@
             <p>
                 My version has been adapted for the use with abctransposer.de and it searches through several tunebooks with tunes mostly from Scandinavia and the neighbouring countries. For this it uses a database creating tunes from abc in the so-called contour format. The <a href="abc-zu-folkfriend-json.html">javascript converter</a> outputs a json file called folkfriend-non-user-data.json
                 which contains all the necessary information to find the tune and connect it to the actual abc on the tune website <a href="https://www.abctransposer.de">abctransposer.de</a>. 
-
+                You find the source code of this fork at <a href="https://github.com/jensisjensis/Abctransposer---search-by-recording">https://github.com/jensisjensis/Abctransposer---search-by-recording</a>
             </p>
             <p>
                 The original code Eso Qué Ye was based on is <a href="https://folkfriend.app" target="_blank">FolkFriend</a>,
