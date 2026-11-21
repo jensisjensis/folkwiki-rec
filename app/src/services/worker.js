@@ -36,7 +36,11 @@ class FolkFriendWASMWrapper {
     }
 
     async fetchTuneIndexMetadata() {
-        const response = await fetch('/nud-meta.json', {
+        // Ein eindeutiger Query-Parameter verhindert, dass ein Browser
+        // oder zwischengeschalteter Cache alte Metadaten zurückgibt.
+        const url = '/nud-meta.json?_=' + Date.now();
+
+        const response = await fetch(url, {
             cache: 'no-store'
         });
 
@@ -64,9 +68,14 @@ class FolkFriendWASMWrapper {
         console.time('index-fetch');
 
         try {
+            // "v" identifiziert die Datenversion. Der zusätzliche
+            // Zeitstempel umgeht auch Caches, die Query-Parameter speziell
+            // behandeln oder deren Cache-Regeln nicht korrekt übernehmen.
             const url =
                 '/folkfriend-non-user-data.json?v=' +
-                encodeURIComponent(String(version));
+                encodeURIComponent(String(version)) +
+                '&_=' +
+                Date.now();
 
             const response = await fetch(url, {
                 cache: 'no-store'
@@ -87,7 +96,7 @@ class FolkFriendWASMWrapper {
     }
 
     async setupTuneIndex(cb) {
-        // Load the tune index at startup and keep an offline copy.
+        // Lädt den Tune-Index beim Start und hält eine Offline-Kopie vor.
         const t0 = performance.now();
         const analyticsData = {
             newly_installed: false,
@@ -100,7 +109,9 @@ class FolkFriendWASMWrapper {
             const localTuneIndex = await get('tuneIndex');
 
             if (typeof localTuneIndex === 'undefined') {
-                console.debug('No tune index was cached, requesting download');
+                console.debug(
+                    'No tune index was cached, requesting download'
+                );
 
                 console.time('tune-index-load');
 
@@ -108,12 +119,15 @@ class FolkFriendWASMWrapper {
                 let downloadedTuneIndex;
 
                 try {
-                    // Read the version first so it can be used as the
-                    // query parameter when downloading the tune index.
-                    tuneIndexMetadata = await this.fetchTuneIndexMetadata();
-                    downloadedTuneIndex = await this.fetchTuneIndexData(
-                        tuneIndexMetadata.v
-                    );
+                    // Zuerst die aktuelle Version abrufen. Sie wird
+                    // anschließend beim Abruf der Indexdatei mitgeschickt.
+                    tuneIndexMetadata =
+                        await this.fetchTuneIndexMetadata();
+
+                    downloadedTuneIndex =
+                        await this.fetchTuneIndexData(
+                            tuneIndexMetadata.v
+                        );
 
                     await this.loadTuneIndex(downloadedTuneIndex);
                 } finally {
@@ -130,8 +144,8 @@ class FolkFriendWASMWrapper {
             } else {
                 console.debug('Found cached tune index');
 
-                // Load the cached index immediately so the app remains usable
-                // while checking whether a newer version is available.
+                // Den vorhandenen Index sofort laden, damit die Anwendung
+                // auch bei fehlender Netzwerkverbindung nutzbar bleibt.
                 console.time('tune-index-load');
 
                 try {
@@ -140,11 +154,12 @@ class FolkFriendWASMWrapper {
                     console.timeEnd('tune-index-load');
                 }
 
-                let tuneIndexMetadataLocal = await get('tuneIndexMetadata');
+                let tuneIndexMetadataLocal =
+                    await get('tuneIndexMetadata');
 
                 if (typeof tuneIndexMetadataLocal === 'undefined') {
-                    // Metadata may be missing if it was cleared separately
-                    // from the cached tune index.
+                    // Die Metadaten können fehlen, wenn nur ein Teil des
+                    // lokalen Caches gelöscht wurde.
                     tuneIndexMetadataLocal = { v: 0 };
                 }
 
@@ -152,11 +167,15 @@ class FolkFriendWASMWrapper {
                     tuneIndexMetadataLocal.v;
 
                 try {
+                    // Durch den Cache-Buster wird die aktuelle Serverversion
+                    // geprüft, statt eventuell alte Metadaten zu verwenden.
                     const tuneIndexMetadataRemote =
                         await this.fetchTuneIndexMetadata();
 
-                    const remoteVersion = String(tuneIndexMetadataRemote.v);
-                    const localVersion = String(tuneIndexMetadataLocal.v);
+                    const remoteVersion =
+                        String(tuneIndexMetadataRemote.v);
+                    const localVersion =
+                        String(tuneIndexMetadataLocal.v);
 
                     console.debug(
                         'Tune index remote: ' + remoteVersion +
@@ -171,10 +190,14 @@ class FolkFriendWASMWrapper {
                                 tuneIndexMetadataRemote.v
                             );
 
-                        // Update WASM and the offline IndexedDB copy.
+                        // Die neue Datenversion in WASM laden und danach
+                        // im lokalen IndexedDB-Cache speichern.
                         await this.loadTuneIndex(downloadedTuneIndex);
                         await set('tuneIndex', downloadedTuneIndex);
-                        await set('tuneIndexMetadata', tuneIndexMetadataRemote);
+                        await set(
+                            'tuneIndexMetadata',
+                            tuneIndexMetadataRemote
+                        );
 
                         analyticsData.days_since_update = 0;
                         analyticsData.tune_index_metadata_version =
@@ -182,8 +205,8 @@ class FolkFriendWASMWrapper {
                         analyticsData.newly_updated = true;
                     }
                 } catch (error) {
-                    // Keep using the cached index if the network or update
-                    // request is unavailable.
+                    // Bei Netzwerk- oder Ladefehlern wird der lokale Index
+                    // weiterhin verwendet.
                     console.warn(
                         'Could not check for or load a tune index update; ' +
                         'using the cached index.',
@@ -216,8 +239,8 @@ class FolkFriendWASMWrapper {
     async setSampleRate(sampleRate) {
         await this.loadedWASM;
 
-        // Invalid sample rates are ignored by the WASM backend, which
-        // retains its default. The caller should validate the value.
+        // Ungültige Abtastraten werden vom WASM-Backend ignoriert;
+        // es behält dann seinen Standardwert.
         await this.folkfriendWASM.set_sample_rate(sampleRate);
         this.setLoadedSampleRate();
     }
@@ -260,12 +283,15 @@ class FolkFriendWASMWrapper {
     async transcribePCMBuffer(cb) {
         try {
             await this.loadedWASM;
+
             const contour =
                 await this.folkfriendWASM.transcribe_pcm_buffer();
+
             cb(contour);
         } catch (error) {
             console.error(error);
             console.warn('Aborting transcribePCMBuffer');
+
             cb(JSON.stringify({
                 error: 'An error ocurred whilst transcribing audio.'
             }));
@@ -278,6 +304,7 @@ class FolkFriendWASMWrapper {
 
         const response =
             await this.folkfriendWASM.run_transcription_query(query);
+
         cb(JSON.parse(response));
     }
 
@@ -289,11 +316,14 @@ class FolkFriendWASMWrapper {
     async transcribePCMBufferSnapshot(cb) {
         try {
             await this.loadedWASM;
+
             const contour =
                 await this.folkfriendWASM.transcribe_pcm_buffer_snapshot();
+
             cb(contour);
         } catch (error) {
             console.error(error);
+
             cb(JSON.stringify({
                 error: 'An error ocurred whilst transcribing audio.'
             }));
@@ -304,7 +334,9 @@ class FolkFriendWASMWrapper {
         await this.loadedWASM;
         await this.loadedIndex;
 
-        const response = await this.folkfriendWASM.run_name_query(query);
+        const response =
+            await this.folkfriendWASM.run_name_query(query);
+
         cb(JSON.parse(response));
     }
 }
