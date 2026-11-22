@@ -2,15 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
-  repository_dispatch:
-    types: [tune-index-updated]
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'Tune index release tag to deploy (e.g. tune-index-2024-01-01T12-00-00)'
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -18,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
@@ -27,6 +21,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -34,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
@@ -50,7 +45,8 @@ jobs:
             ~/.cargo/git
             rust/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -62,28 +58,6 @@ jobs:
       - name: Install npm dependencies
         working-directory: app
         run: npm ci
-
-      - name: Generate token for asturtrad access
-        id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3
-        with:
-          app-id: ${{ secrets.ASTURTRAD_APP_ID }}
-          private-key: ${{ secrets.ASTURTRAD_APP_PRIVATE_KEY }}
-          repositories: asturtrad
-
-      - name: Download tune index
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          RELEASE_TAG="${{ github.event.client_payload.release_tag || inputs.release_tag }}"
-          if [ -z "$RELEASE_TAG" ]; then
-            RELEASE_TAG=$(gh release list --repo ${{ secrets.TUNE_INDEX_REPO }} --limit 20 --json tagName \
-              --jq '[.[] | select(.tagName | startswith("tune-index-"))] | first | .tagName')
-          fi
-          gh release download "$RELEASE_TAG" \
-            --repo ${{ secrets.TUNE_INDEX_REPO }} \
-            --pattern "*.json" \
-            --dir app/public/
 
       - name: Build Vue app
         working-directory: app

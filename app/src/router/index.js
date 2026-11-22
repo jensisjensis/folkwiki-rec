@@ -11,10 +11,6 @@ Vue.use(VueRouter);
 
 const routes = [{
     path: '/',
-    redirect: { name: 'search' }
-}, {
-    path: '/search',
-    alias: '/mic.html',
     name: 'search',
     component: Search
 }, {
@@ -30,7 +26,6 @@ const routes = [{
     name: 'help',
     component: Help
 }];
-
 
 const router = new VueRouter({
     mode: 'history',
