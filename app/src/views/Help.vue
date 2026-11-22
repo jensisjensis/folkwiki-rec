@@ -18,12 +18,14 @@
                 <em>Folkwiki - search by recording</em> is a fork of <a href="https://github.com/jensisjensis/Abctransposer---search-by-recording" target="_blank">Abctransposer - Search by recording</a> which searches the website <a href="https://www.abctransposer.de" target="_blank">abctransposer.de</a> database, which contains tunes in the abc format.
             </p>
             <p>
-                My version has been adapted for the use with the Swedish site for traditional music from Scandinavia <a href="http://www.folkwiki.se/Musik/Musik">folkwiki.se</a> and it searches through its database in the abc format. For this it uses a database creating tunes from abc in the so-called contour format. The <a href="abc-to-folkfriend-json.html">javascript converter</a> outputs a json file called folkfriend-non-user-data.json
-                which contains all the necessary information to find the tune and connect it to the actual abc on the tune website <a href="https://www.abctransposer.de">abctransposer.de</a>. 
-                You find the source code of this fork at <a href="https://github.com/jensisjensis/Abctransposer---search-by-recording">https://github.com/jensisjensis/Abctransposer---search-by-recording</a>
+                My version has been adapted for the use with the Swedish site for traditional music from Scandinavia <a href="http://www.folkwiki.se/Musik/Musik">folkwiki.se</a>. 
+                In preparation I have downloaded the website's database as sqlite3 and extracted all the abcs contained and assigened the number leading to the respective page on folkwiki.
+                 After converting the melodies contained in the abc to the so-called contour format the tunes become reckognizable when recording audio.
+                 The project I developed this from is on my website <a href="https://www.abctransposer.de">abctransposer.de</a>. 
+                You find the source code of that fork at <a href="https://github.com/jensisjensis/Abctransposer---search-by-recording">https://github.com/jensisjensis/Abctransposer---search-by-recording</a>
             </p>
             <p>
-                The original code Eso Qué Ye was based on is <a href="https://folkfriend.app" target="_blank">FolkFriend</a>,
+                For the abctransposer website I used the original code from <a href="https://github.com/davidfm/eso-que-ye/tree/main">Eso Qué Ye</a> which was based on is <a href="https://folkfriend.app" target="_blank">FolkFriend</a>,
                 originally developed by <a href="https://github.com/TomWyllie" target="_blank">Tom Wyllie</a>,
                 who deserves all the credit for the recognition engine, the architecture,
                 and the original application. If you play Irish or other folk music traditions,
@@ -31,7 +33,7 @@
             </p>
             <p>
                 This project is licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GPL-3.0</a>.
-                The source code is available on <a href="https://github.com/davidfm/eso-que-ye" target="_blank">GitHub</a>.
+                The source code is available on <a href="https://github.com/jensisjensis/folkwiki-rec" target="_blank">GitHub</a>.
             </p>
         </v-card>
         <p class="AppInfo">
