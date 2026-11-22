@@ -92,7 +92,7 @@ export default {
 
     computed: {
         asturTradUrl: function () {
-            return tuneUrl(this.setting);
+            return tuneUrl(this.settingID);
         },
 
         descriptor: function () {
