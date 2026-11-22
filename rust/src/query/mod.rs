@@ -21,7 +21,7 @@ pub struct QueryEngine {
     num_repass: usize,
     num_output: usize,
     // How many keys besides the original to try per setting. 0 disables
-    //  transposition, i.e. only matches in the key the setting is written in.
+    // transposition, i.e. only matches in the key the setting is written in.
     pub transposition_candidates: usize,
 }
 
@@ -38,6 +38,7 @@ pub struct TranscriptionQueryRecord {
 
 #[derive(Debug, Serialize)]
 pub struct NameQueryRecord {
+    pub setting_id: SettingID,
     pub setting: Setting,
     pub display_name: String,
     pub aliases: Vec<String>,
@@ -99,7 +100,7 @@ impl QueryEngine {
                 let mut first_search =
                     heuristic::run_transcription_query(&query, &self.prepared_settings);
                 first_search.truncate(self.num_repass);
-                    // eprintln!("Heuristic search took {:.2?}", nowh.elapsed());
+                // eprintln!("Heuristic search took {:.2?}", nowh.elapsed());
                 //
                 // === Full search ===
                 // Second pass: slow, but accurate. Good for refining a shortlist of candidates.
@@ -169,17 +170,19 @@ impl QueryEngine {
 
                 // scored_names.sort_unstable_by(|a, b| b.ngram_score.partial_cmp(&a.ngram_score).unwrap());
 
-                scored_names.sort_unstable_by(|a, b| match b.ngram_score.partial_cmp(&a.ngram_score).unwrap() {
-                    std::cmp::Ordering::Less => std::cmp::Ordering::Less,
-                    std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
-                    std::cmp::Ordering::Equal => {
-                        let a_alias_len =
-                            &tune_index.aliases.get(&a.tune_id).unwrap()[a.alias_index].len();
-                        let b_alias_len =
-                            &tune_index.aliases.get(&b.tune_id).unwrap()[b.alias_index].len();
-                        return a_alias_len.cmp(&b_alias_len);
-                    }
-                });
+                scored_names.sort_unstable_by(
+                    |a, b| match b.ngram_score.partial_cmp(&a.ngram_score).unwrap() {
+                        std::cmp::Ordering::Less => std::cmp::Ordering::Less,
+                        std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+                        std::cmp::Ordering::Equal => {
+                            let a_alias_len =
+                                &tune_index.aliases.get(&a.tune_id).unwrap()[a.alias_index].len();
+                            let b_alias_len =
+                                &tune_index.aliases.get(&b.tune_id).unwrap()[b.alias_index].len();
+                            a_alias_len.cmp(b_alias_len)
+                        }
+                    },
+                );
 
                 let mut tune_ids_in_results: HashSet<TuneID> = HashSet::default();
 
@@ -188,24 +191,29 @@ impl QueryEngine {
                     .filter(|t| tune_ids_in_results.insert(t.tune_id.clone()))
                     .take(20)
                     .map(|t| {
-                        {
-                            let tune_aliases = tune_index.aliases.get(&t.tune_id).unwrap();
-                            NameQueryRecord {
-                                // TODO safer checks in index builder that there can
-                                //  never be an alias without a corresponding setting
-                                setting: tune_index
-                                    .settings
-                                    .get(&self.setting_ids_from_tune_id(t.tune_id.clone()).unwrap()[0])
-                                    .unwrap()
-                                    .clone(),
-                                display_name: tune_aliases[0].clone(),
-                                aliases: tune_aliases[1..].to_vec(),
-                            }
+                        let tune_aliases = tune_index.aliases.get(&t.tune_id).unwrap();
+
+                        let setting_id = self
+                            .setting_ids_from_tune_id(t.tune_id.clone())
+                            .unwrap()[0]
+                            .clone();
+
+                        let setting = tune_index
+                            .settings
+                            .get(&setting_id)
+                            .unwrap()
+                            .clone();
+
+                        NameQueryRecord {
+                            setting_id,
+                            setting,
+                            display_name: tune_aliases[0].clone(),
+                            aliases: tune_aliases[1..].to_vec(),
                         }
                     })
                     .collect();
 
-                return Ok(top_scores);
+                Ok(top_scores)
             }
         }
     }
