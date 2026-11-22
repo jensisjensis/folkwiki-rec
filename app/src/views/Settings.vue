@@ -41,14 +41,14 @@
         >
             <h1>Download</h1>
             <p>
-                Abctransposer - search by recording is a "Web App", which means it installs onto your
+                Folkwiki - search by recording is a "Web App", which means it installs onto your
                 Home Screen just like any other app.
             </p>
             <p
                 v-if="isPWA"
                 align="center"
             >
-                Abctransposer - search by recording is installed <v-icon class="pb-1 Installed">
+                Folkwiki - search by recording is installed <v-icon class="pb-1 Installed">
                     {{ icons.checkCircle }}
                 </v-icon>
             </p>
