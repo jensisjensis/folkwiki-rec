@@ -36,9 +36,11 @@ class FolkFriendWASMWrapper {
     }
 
     async fetchTuneIndexMetadata() {
-        // Ein eindeutiger Query-Parameter verhindert, dass ein Browser
-        // oder zwischengeschalteter Cache alte Metadaten zurückgibt.
-        const url = '/nud-meta.json?_=' + Date.now();
+        // BASE_URL ist lokal "/" und bei GitHub Pages "/folkwiki-rec/".
+        const url =
+            process.env.BASE_URL +
+            'nud-meta.json?_=' +
+            Date.now();
 
         const response = await fetch(url, {
             cache: 'no-store'
@@ -68,11 +70,10 @@ class FolkFriendWASMWrapper {
         console.time('index-fetch');
 
         try {
-            // "v" identifiziert die Datenversion. Der zusätzliche
-            // Zeitstempel umgeht auch Caches, die Query-Parameter speziell
-            // behandeln oder deren Cache-Regeln nicht korrekt übernehmen.
+            // BASE_URL sorgt auch hier für den richtigen Pages-Unterpfad.
             const url =
-                '/folkfriend-non-user-data.json?v=' +
+                process.env.BASE_URL +
+                'folkfriend-non-user-data.json?v=' +
                 encodeURIComponent(String(version)) +
                 '&_=' +
                 Date.now();
