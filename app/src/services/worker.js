@@ -36,9 +36,10 @@ class FolkFriendWASMWrapper {
     }
 
     async fetchTuneIndexMetadata() {
-        // Ein eindeutiger Query-Parameter verhindert, dass ein Browser
-        // oder zwischengeschalteter Cache alte Metadaten zurückgibt.
-        const url = '/nud-meta.json?_=' + Date.now();
+        const url =
+            process.env.BASE_URL +
+            'nud-meta.json?_=' +
+            Date.now();
 
         const response = await fetch(url, {
             cache: 'no-store'
@@ -68,11 +69,9 @@ class FolkFriendWASMWrapper {
         console.time('index-fetch');
 
         try {
-            // "v" identifiziert die Datenversion. Der zusätzliche
-            // Zeitstempel umgeht auch Caches, die Query-Parameter speziell
-            // behandeln oder deren Cache-Regeln nicht korrekt übernehmen.
             const url =
-                '/folkfriend-non-user-data.json?v=' +
+                process.env.BASE_URL +
+                'folkfriend-non-user-data.json?v=' +
                 encodeURIComponent(String(version)) +
                 '&_=' +
                 Date.now();
@@ -96,7 +95,6 @@ class FolkFriendWASMWrapper {
     }
 
     async setupTuneIndex(cb) {
-        // Lädt den Tune-Index beim Start und hält eine Offline-Kopie vor.
         const t0 = performance.now();
         const analyticsData = {
             newly_installed: false,
@@ -119,8 +117,6 @@ class FolkFriendWASMWrapper {
                 let downloadedTuneIndex;
 
                 try {
-                    // Zuerst die aktuelle Version abrufen. Sie wird
-                    // anschließend beim Abruf der Indexdatei mitgeschickt.
                     tuneIndexMetadata =
                         await this.fetchTuneIndexMetadata();
 
@@ -144,8 +140,6 @@ class FolkFriendWASMWrapper {
             } else {
                 console.debug('Found cached tune index');
 
-                // Den vorhandenen Index sofort laden, damit die Anwendung
-                // auch bei fehlender Netzwerkverbindung nutzbar bleibt.
                 console.time('tune-index-load');
 
                 try {
@@ -158,8 +152,6 @@ class FolkFriendWASMWrapper {
                     await get('tuneIndexMetadata');
 
                 if (typeof tuneIndexMetadataLocal === 'undefined') {
-                    // Die Metadaten können fehlen, wenn nur ein Teil des
-                    // lokalen Caches gelöscht wurde.
                     tuneIndexMetadataLocal = { v: 0 };
                 }
 
@@ -167,8 +159,6 @@ class FolkFriendWASMWrapper {
                     tuneIndexMetadataLocal.v;
 
                 try {
-                    // Durch den Cache-Buster wird die aktuelle Serverversion
-                    // geprüft, statt eventuell alte Metadaten zu verwenden.
                     const tuneIndexMetadataRemote =
                         await this.fetchTuneIndexMetadata();
 
@@ -190,8 +180,6 @@ class FolkFriendWASMWrapper {
                                 tuneIndexMetadataRemote.v
                             );
 
-                        // Die neue Datenversion in WASM laden und danach
-                        // im lokalen IndexedDB-Cache speichern.
                         await this.loadTuneIndex(downloadedTuneIndex);
                         await set('tuneIndex', downloadedTuneIndex);
                         await set(
@@ -205,8 +193,6 @@ class FolkFriendWASMWrapper {
                         analyticsData.newly_updated = true;
                     }
                 } catch (error) {
-                    // Bei Netzwerk- oder Ladefehlern wird der lokale Index
-                    // weiterhin verwendet.
                     console.warn(
                         'Could not check for or load a tune index update; ' +
                         'using the cached index.',
@@ -239,8 +225,6 @@ class FolkFriendWASMWrapper {
     async setSampleRate(sampleRate) {
         await this.loadedWASM;
 
-        // Ungültige Abtastraten werden vom WASM-Backend ignoriert;
-        // es behält dann seinen Standardwert.
         await this.folkfriendWASM.set_sample_rate(sampleRate);
         this.setLoadedSampleRate();
     }
