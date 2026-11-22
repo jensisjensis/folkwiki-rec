@@ -91,8 +91,18 @@ export default {
     },
 
     computed: {
-        asturTradUrl: function () {
-            return tuneUrl(this.settingID);
+        resolvedSettingID() {
+            return this.settingID || this.setting.tune_id || null;
+        },
+
+        asturTradUrl() {
+            const tuneID = this.resolvedSettingID;
+
+            if (tuneID === null || tuneID === '') {
+                return null;
+            }
+
+            return tuneUrl(String(tuneID));
         },
 
         descriptor: function () {
@@ -153,7 +163,7 @@ export default {
     methods: {
         addToHistory() {
             store.addToHistory(new HistoryItem({
-                settingID: this.settingID,
+                settingID: this.resolvedSettingID,
                 setting: this.setting,
                 displayName: this.displayName,
                 aliases: this.aliases
@@ -184,6 +194,7 @@ export default {
   overflow: visible;
   transform: translateY(-3px);
 }
+
 .title-row {
   min-width: 0;
 }
