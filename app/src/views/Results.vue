@@ -6,18 +6,20 @@
         <h1 class="my-2">
             Results
         </h1>
+
         <v-list class="resultsTable">
             <ResultRow
                 v-for="result in lastResults"
-                :key="`${result.setting.tune_id}`"
+                :key="getSettingID(result) || result.setting.tune_id"
                 :setting="result.setting"
                 :display-name="result.display_name"
                 :aliases="result.aliases || []"
-                :setting-i-d="result.setting_id"
+                :setting-i-d="getSettingID(result)"
                 :score="result.score"
             />
         </v-list>
     </v-container>
+
     <v-container v-else>
         <h1 class="my-2">
             Results
@@ -34,14 +36,29 @@ import store from '@/services/store';
 
 export default {
     name: 'SearchesView',
+
     components: {
         ResultRow,
     },
-    data: function () {
+
+    data() {
         return {
             lastResults: store.state.lastResults
         };
     },
+
+    methods: {
+        getSettingID(result) {
+            const settingID = result.settingID !== undefined &&
+                result.settingID !== null
+                ? result.settingID
+                : result.setting_id;
+
+            return settingID !== undefined && settingID !== null
+                ? String(settingID)
+                : null;
+        }
+    }
 };
 </script>
 
@@ -54,5 +71,4 @@ export default {
 .resultsTable > a:nth-child(odd) {
     background: #efefef;
 }
-
 </style>
