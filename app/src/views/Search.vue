@@ -1,7 +1,7 @@
 <template>
     <div class="search">
         <router-link to="/" class="search-title">
-            Abctransposer - search by recording
+            Folkwiki - search by recording
         </router-link>
 
         <RecorderButton

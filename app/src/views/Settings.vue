@@ -94,7 +94,7 @@
                 </ul>
             </p>
             <p v-else>
-                To install Abctransposer - search by recording, navigate to the settings of your browser
+                To install Folkwiki - search by recording, navigate to the settings of your browser
                 and select "Add to Home Screen" or "Install App".
             </p>
         </v-card>
