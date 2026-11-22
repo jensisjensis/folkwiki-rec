@@ -28,7 +28,7 @@ module.exports = {
     },
 
     pwa: {
-        name: 'Eso qué ye?',
+        name: 'Folkwiki - search by recording',
         theme_color: '#055581',
         background_color: '#055581',
     },

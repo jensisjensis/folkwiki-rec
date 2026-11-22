@@ -79,7 +79,7 @@
                     <li>
                         Tap <v-icon class="pb-1">
                             {{ icons.installMobile }}
-                        </v-icon> "Install Eso qué ye?"
+                        </v-icon> "Install Folkwiki - search by recording?"
                     </li>
                 </ul>
             </p>

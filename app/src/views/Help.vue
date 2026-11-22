@@ -18,7 +18,7 @@
                 <em>Folkwiki - search by recording</em> is a fork of <a href="https://github.com/jensisjensis/Abctransposer---search-by-recording" target="_blank">Abctransposer - Search by recording</a> which searches the website <a href="https://www.abctransposer.de" target="_blank">abctransposer.de</a> database, which contains tunes in the abc format.
             </p>
             <p>
-                My version has been adapted for the use with the Swedish site for traditional music from Scandinavia <a href="http://www.folkwiki.se/Musik/Musik">folkwiki.sh</a> and it searches through its database in the abc format. For this it uses a database creating tunes from abc in the so-called contour format. The <a href="abc-to-folkfriend-json.html">javascript converter</a> outputs a json file called folkfriend-non-user-data.json
+                My version has been adapted for the use with the Swedish site for traditional music from Scandinavia <a href="http://www.folkwiki.se/Musik/Musik">folkwiki.se</a> and it searches through its database in the abc format. For this it uses a database creating tunes from abc in the so-called contour format. The <a href="abc-to-folkfriend-json.html">javascript converter</a> outputs a json file called folkfriend-non-user-data.json
                 which contains all the necessary information to find the tune and connect it to the actual abc on the tune website <a href="https://www.abctransposer.de">abctransposer.de</a>. 
                 You find the source code of this fork at <a href="https://github.com/jensisjensis/Abctransposer---search-by-recording">https://github.com/jensisjensis/Abctransposer---search-by-recording</a>
             </p>
@@ -35,7 +35,7 @@
             </p>
         </v-card>
         <p class="AppInfo">
-             Based on FolkFriend v1.3.0 and Eso Qué Ye and Abctransposer - search by recording. <br>Melody index: {{ tuneIndexVersion }}<br>© {{ year }} Tom Wyllie (original) · Fork by David Fernández and then forked by Jens Wollschläger
+             Based on FolkFriend v1.3.0 and Eso Qué Ye and Abctransposer - search by recording. <br>© {{ year }} Tom Wyllie (original) · Fork by David Fernández and then forked by Jens Wollschläger
         </p>
     </v-container>
 </template>
