@@ -609,6 +609,10 @@ function prepareKey(rawKey) {
   return value;
 }
 
+function isPlaceholderTitle(title) {
+  return /^untitled(?:\s+tune)?(?:[\s-]*\d+)?$/i.test((title || "").trim());
+}
+
 function parseTune(block) {
   const titles = [...block.matchAll(/^\s*T\s*:\s*(.*)$/gmi)]
     .map(match => match[1].trim())
@@ -930,6 +934,11 @@ function buildIndex(baseIndex, sources, dance) {
   const report = [];
   const errorDetails = [];
 
+  // Remember successful tunes processed during this conversion.
+  // A later placeholder title must not replace an earlier real title
+  // when multiple ABC blocks share the same I: value.
+  const processedTitles = new Map();
+
   for (const source of sources) {
     for (const block of splitTunes(source.text)) {
       const linkIndex = headerField(block, "I", "").trim();
@@ -948,6 +957,22 @@ function buildIndex(baseIndex, sources, dance) {
         if (measureCount < 4) {
           report.push(
             `SKIPPED I:${linkIndex}: only ${measureCount} measure(s); at least 4 required.`
+          );
+          continue;
+        }
+
+        // Preserve a previous titled tune if a duplicate I: block has no
+        // usable title. A later titled block can still replace an untitled one.
+        const priorTitle = processedTitles.get(linkIndex);
+
+        if (
+          priorTitle &&
+          !isPlaceholderTitle(priorTitle) &&
+          isPlaceholderTitle(tune.title)
+        ) {
+          report.push(
+            `SKIPPED I:${linkIndex}: untitled duplicate block; ` +
+            `kept earlier titled tune "${priorTitle}".`
           );
           continue;
         }
@@ -981,6 +1006,7 @@ function buildIndex(baseIndex, sources, dance) {
         };
 
         aliases[tuneId] = [...new Set(tune.titles)];
+        processedTitles.set(linkIndex, tune.title);
         report.push(`OK I:${linkIndex} → ${tuneId}`);
 
         for (const warning of tune.warnings) {
