@@ -59,7 +59,7 @@ export default {
                     ),
                     descriptor: utils.parseDisplayableDescription(setting),
                     timestamp: historyItem.timestamp,
-                    url: tuneUrl(setting.result.settingID),
+                    url: tuneUrl(historyItem.result.settingID),
                 };
             });
         });
