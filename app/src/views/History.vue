@@ -44,22 +44,37 @@ export default {
 
         store.getHistoryItems().then((historyItems) => {
             this.historyItems = historyItems.filter(
-                historyItem => !historyItem.result.contour
+                historyItem => historyItem.result && !historyItem.result.contour
             );
 
             this.historyRowsProps = this.historyItems.map((historyItem) => {
-                const setting = historyItem.result.setting;
+                const result = historyItem.result || {};
+                const setting = result.setting || {};
+
+                const settingID = result.settingID != null && result.settingID !== ''
+                    ? result.settingID
+                    : setting.tune_id;
+
+                const url = settingID != null && settingID !== ''
+                    ? tuneUrl(String(settingID))
+                    : null;
+
+                if (!url) {
+                    console.warn('[History: keine URL erzeugt]', {
+                        settingID,
+                        setting,
+                        result
+                    });
+                }
 
                 return {
-                    name: utils.parseDisplayableName(
-                        historyItem.result.displayName
-                    ),
-                    aliases: (historyItem.result.aliases || []).map(alias =>
+                    name: utils.parseDisplayableName(result.displayName),
+                    aliases: (result.aliases || []).map(alias =>
                         utils.parseDisplayableName(alias)
                     ),
                     descriptor: utils.parseDisplayableDescription(setting),
                     timestamp: historyItem.timestamp,
-                    url: tuneUrl(historyItem.result.settingID),
+                    url: url || '',
                 };
             });
         });
@@ -70,10 +85,4 @@ export default {
 </script>
 
 <style scoped>
-.resultsTable > div:nth-child(odd) {
-    background: #efefef;
-}
-.container {
-  cursor: pointer;
-}
 </style>

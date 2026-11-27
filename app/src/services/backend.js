@@ -129,6 +129,7 @@ class FFBackend {
     async submitFilledBuffer() {
         let t0 = performance.now();
         const contour = await this.transcribePCMBuffer();
+        store.state.lastContour = contour;
         let tEnd = performance.now();
 
         console.debug('contour', contour);

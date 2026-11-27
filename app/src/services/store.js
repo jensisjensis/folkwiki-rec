@@ -22,6 +22,7 @@ class Store {
         this.state = {
             indexLoaded: false,
             lastResults: [],
+            lastContour: null,
             lastTimer: null,
             backendVersion: 'not loaded',
             tuneIndexVersion: 'not loaded'
